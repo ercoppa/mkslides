@@ -39,6 +39,7 @@ class MarkupGenerator:
         global_config: DictConfig,
         output_directory_path: Path,
         strict: bool,
+        custom_assets_dir: Path | None = None,
     ) -> None:
         self.global_config = global_config
 
@@ -49,6 +50,7 @@ class MarkupGenerator:
 
         self.output_assets_path = self.output_directory_path / "assets"
         self.output_revealjs_path = self.output_assets_path / "reveal-js"
+        self.custom_assets_dir = custom_assets_dir
 
         self.strict = strict
 
@@ -69,6 +71,11 @@ class MarkupGenerator:
 
         with resources.as_file(REVEALJS_RESOURCE) as revealjs_path:
             self.__copy(revealjs_path, self.output_revealjs_path)
+
+        # Merge custom assets if provided
+        if self.custom_assets_dir:
+            logger.info(f"Merging custom assets from '{self.custom_assets_dir.absolute()}'")
+            self.__copy(self.custom_assets_dir, self.output_assets_path)
 
     def process_markdown(self, input_path: Path) -> None:
         logger.debug("Processing markdown")

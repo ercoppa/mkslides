@@ -62,13 +62,14 @@ def serve(
     input_path: Path,
     output_path: Path,
     serve_config: DictConfig,
+    assets_dir: Path | None = None,
 ) -> None:
     config_path = config.internal.config_path
 
     def reload() -> None:
         logger.info("Reloading...")
         new_config = get_config(config_path)
-        build(new_config, input_path, output_path, serve_config.strict)
+        build(new_config, input_path, output_path, serve_config.strict, assets_dir)
 
         new_paths_to_watch = determine_paths_to_watch(input_path, new_config)
         diff_paths_to_watch = set(new_paths_to_watch) - set(paths_to_watch)
@@ -76,7 +77,7 @@ def serve(
             logger.debug(f"Adding new watched path: '{path}'")
             server.watch(filepath=path.as_posix(), func=reload, delay=1)
 
-    build(config, input_path, output_path, serve_config.strict)
+    build(config, input_path, output_path, serve_config.strict, assets_dir)
     paths_to_watch = determine_paths_to_watch(input_path, config)
 
     try:

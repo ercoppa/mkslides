@@ -84,11 +84,19 @@ def cli(verbose: bool) -> None:
     default=DEFAULT_OUTPUT_DIR,
 )
 @click.option("-s", "--strict", **strict_argument_data)  # type: ignore[arg-type]
+@click.option(
+    "--assets-dir",
+    type=click.Path(exists=True, path_type=Path),
+    help="Custom assets directory to merge with the official reveal.js assets.",
+    metavar="PATH",
+    default=None,
+)
 def build_command(
     files: Path,
     config_file: Path | None,
     site_dir: str,
     strict: bool,
+    assets_dir: Path | None,
 ) -> None:
     """
     Build the MkDocs documentation.
@@ -106,7 +114,7 @@ def build_command(
         )
         sys.exit(1)
 
-    build(config, files, output_path, strict)
+    build(config, files, output_path, strict, assets_dir)
 
 
 # Serve Command ################################################################
@@ -130,12 +138,20 @@ def build_command(
     help="Open the website in a Web browser after the initial build finishes.",
     is_flag=True,
 )
+@click.option(
+    "--assets-dir",
+    type=click.Path(exists=True, path_type=Path),
+    help="Custom assets directory to merge with the official reveal.js assets.",
+    metavar="PATH",
+    default=None,
+)
 def serve_command(
     files: Path,
     config_file: Path | None,
     strict: bool,
     dev_addr: str,
     open_in_browser: bool,
+    assets_dir: Path | None,
 ) -> None:
     """
     Run the builtin development server.
@@ -161,6 +177,7 @@ def serve_command(
         files,
         output_path,
         serve_config,
+        assets_dir,
     )
 
 
