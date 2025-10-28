@@ -90,6 +90,20 @@ def serve(
             logger.debug(f"Watching: '{path}'")
             server.watch(filepath=path.as_posix(), func=reload, delay=1)
 
+        # Watch JavaScript files in assets directory if it exists
+        if assets_dir:
+            # Resolve to absolute path
+            assets_dir_resolved = assets_dir.resolve(strict=False).absolute()
+            logger.info(f"Assets directory: '{assets_dir_resolved}'")
+            if assets_dir_resolved.exists():
+                js_dir = assets_dir_resolved / "js"
+                if js_dir.exists():
+                    for js_file in js_dir.glob("*.js"):
+                        logger.info(f"Watching JS file: '{js_file}'")
+                        server.watch(filepath=js_file.as_posix(), func=reload, delay=1)
+                else:
+                    logger.debug(f"JS directory does not exist: '{js_dir}'")
+
         server.serve(
             host=serve_config.dev_ip,
             port=serve_config.dev_port,
