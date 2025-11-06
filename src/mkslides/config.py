@@ -32,6 +32,7 @@ class Slides:
     favicon: Optional[str] = None
     highlight_theme: str = "monokai"
     preprocess_script: Optional[str] = None
+    preprocess_file_script: Optional[str] = None
     separator_notes: Optional[str] = None
     separator_vertical: Optional[str] = None
     separator: Optional[str] = None
@@ -98,6 +99,9 @@ def validate(config: DictConfig) -> None:
 
     if config.slides.preprocess_script:
         Path(config.slides.preprocess_script).resolve(strict=True)
+    
+    if config.slides.preprocess_file_script:
+        Path(config.slides.preprocess_file_script).resolve(strict=True)
 
     if (
         config.slides.template

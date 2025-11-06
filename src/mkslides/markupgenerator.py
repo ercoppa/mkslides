@@ -16,7 +16,7 @@ from natsort import natsorted
 from omegaconf import DictConfig, OmegaConf
 
 from mkslides.config import FRONTMATTER_ALLOWED_KEYS
-from mkslides.preprocess import load_preprocessing_function
+from mkslides.preprocess import load_preprocessing_function, load_file_preprocessing_function
 from mkslides.urltype import URLType
 from mkslides.utils import get_url_type
 
@@ -230,6 +230,23 @@ class MarkupGenerator:
     def __process_markdown_directory(self, md_root_path: Path) -> None:
         md_root_path = md_root_path.resolve(strict=True)
         logger.debug(f"Processing markdown directory at '{md_root_path.absolute()}'")
+        
+        # Check if file preprocessing is configured
+        file_preprocess_func = None
+        if preprocess_file_script := self.global_config.slides.preprocess_file_script:
+            file_preprocess_func = load_file_preprocessing_function(preprocess_file_script)
+            if file_preprocess_func:
+                logger.debug(f"Loaded file preprocessing function from '{preprocess_file_script}'")
+                # Process all files in the directory (including .ipynb files)
+                for file_path in md_root_path.glob("**/*"):
+                    if file_path.is_file():
+                        try:
+                            new_path = file_preprocess_func(file_path)
+                            if new_path and new_path != file_path:
+                                logger.debug(f"File preprocessed: {file_path} -> {new_path}")
+                        except Exception as e:
+                            logger.error(f"Error preprocessing file '{file_path}': {e}")
+        
         slideshows = []
         for md_file in md_root_path.glob("**/*.md"):
             (title_for_index, output_markup_path) = self.__process_markdown_file(
