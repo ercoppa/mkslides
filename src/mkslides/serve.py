@@ -62,14 +62,13 @@ def serve(
     input_path: Path,
     output_path: Path,
     serve_config: DictConfig,
-    assets_dir: Path | None = None,
 ) -> None:
     config_path = config.internal.config_path
 
     def reload() -> None:
         logger.info("Reloading...")
         new_config = get_config(config_path)
-        build(new_config, input_path, output_path, serve_config.strict, assets_dir)
+        build(new_config, input_path, output_path, serve_config.strict)
 
         new_paths_to_watch = determine_paths_to_watch(input_path, new_config)
         diff_paths_to_watch = set(new_paths_to_watch) - set(paths_to_watch)
@@ -77,7 +76,7 @@ def serve(
             logger.debug(f"Adding new watched path: '{path}'")
             server.watch(filepath=path.as_posix(), func=reload, delay=1)
 
-    build(config, input_path, output_path, serve_config.strict, assets_dir)
+    build(config, input_path, output_path, serve_config.strict)
     paths_to_watch = determine_paths_to_watch(input_path, config)
 
     try:
@@ -90,19 +89,17 @@ def serve(
             logger.debug(f"Watching: '{path}'")
             server.watch(filepath=path.as_posix(), func=reload, delay=1)
 
-        # Watch JavaScript files in assets directory if it exists
-        if assets_dir:
-            # Resolve to absolute path
-            assets_dir_resolved = assets_dir.resolve(strict=False).absolute()
-            logger.info(f"Assets directory: '{assets_dir_resolved}'")
-            if assets_dir_resolved.exists():
-                js_dir = assets_dir_resolved / "js"
+        # Watch JavaScript files in theme directory if it's a directory
+        theme = config.slides.theme
+        if theme:
+            theme_path = Path(theme).resolve(strict=False)
+            if theme_path.is_dir():
+                logger.info(f"Watching theme directory: '{theme_path}'")
+                js_dir = theme_path / "js"
                 if js_dir.exists():
                     for js_file in js_dir.glob("*.js"):
-                        logger.info(f"Watching JS file: '{js_file}'")
+                        logger.info(f"Watching theme JS file: '{js_file}'")
                         server.watch(filepath=js_file.as_posix(), func=reload, delay=1)
-                else:
-                    logger.debug(f"JS directory does not exist: '{js_dir}'")
 
         server.serve(
             host=serve_config.dev_ip,

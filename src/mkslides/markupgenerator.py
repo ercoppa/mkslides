@@ -39,7 +39,6 @@ class MarkupGenerator:
         global_config: DictConfig,
         output_directory_path: Path,
         strict: bool,
-        custom_assets_dir: Path | None = None,
     ) -> None:
         self.global_config = global_config
 
@@ -50,7 +49,6 @@ class MarkupGenerator:
 
         self.output_assets_path = self.output_directory_path / "assets"
         self.output_revealjs_path = self.output_assets_path / "reveal-js"
-        self.custom_assets_dir = custom_assets_dir
 
         self.strict = strict
 
@@ -71,11 +69,6 @@ class MarkupGenerator:
 
         with resources.as_file(REVEALJS_RESOURCE) as revealjs_path:
             self.__copy(revealjs_path, self.output_revealjs_path)
-
-        # Merge custom assets if provided
-        if self.custom_assets_dir:
-            logger.info(f"Merging custom assets from '{self.custom_assets_dir.absolute()}'")
-            self.__copy(self.custom_assets_dir, self.output_assets_path)
 
     def process_markdown(self, input_path: Path) -> None:
         logger.debug("Processing markdown")
@@ -158,11 +151,12 @@ class MarkupGenerator:
 
         revealjs_config = slide_config.revealjs
 
-        # Copy the theme CSS
+        # Copy the theme CSS and discover JS files
 
         relative_theme_path = None
+        theme_js_files = []
         if theme := slide_config.slides.theme:
-            relative_theme_path = self.__copy_theme(
+            relative_theme_path, theme_js_files = self.__copy_theme(
                 output_markup_path,
                 theme,
                 REVEALJS_THEMES_RESOURCE,
@@ -172,7 +166,7 @@ class MarkupGenerator:
 
         relative_highlight_theme_path = None
         if theme := slide_config.slides.highlight_theme:
-            relative_highlight_theme_path = self.__copy_theme(
+            relative_highlight_theme_path, _ = self.__copy_theme(
                 output_markup_path,
                 theme,
                 HIGHLIGHTJS_THEMES_RESOURCE,
@@ -218,6 +212,7 @@ class MarkupGenerator:
             markdown=markdown_content,
             revealjs_config=OmegaConf.to_container(revealjs_config),
             plugins=plugins,
+            theme_js_files=theme_js_files,
         )
         self.__create_or_overwrite_file(output_markup_path, markup)
 
@@ -324,36 +319,83 @@ class MarkupGenerator:
         file_using_theme_path: Path,
         theme: str,
         default_theme_resource: Traversable | None = None,
-    ) -> Path | str:
+    ) -> tuple[Path | str | None, list[str]]:
+        """Copy theme and return (css_path, list_of_js_files)."""
         if get_url_type(theme) == URLType.ABSOLUTE:
             logger.debug(
                 f"Using theme '{theme}' from an absolute URL, no copy necessary",
             )
-            return theme
+            return theme, []
 
-        theme_path = None
+        theme_path = Path(theme).resolve(strict=False)
+        theme_js_files = []
+        
+        # Check if theme is a directory
+        if theme_path.is_dir():
+            logger.debug(f"Using theme directory '{theme_path.absolute()}'")
+            # Copy entire directory to assets
+            self.__copy(theme_path, self.output_assets_path)
+            
+            # Find CSS file in theme directory
+            css_files = list(theme_path.glob("**/*.css"))
+            theme_css_path = None
+            if css_files:
+                # Use the first CSS file found, or look for common names
+                for name in ["slides.css", "theme.css", "main.css"]:
+                    matches = [f for f in css_files if f.name == name]
+                    if matches:
+                        theme_css_path = matches[0]
+                        break
+                if not theme_css_path:
+                    theme_css_path = css_files[0]
+                
+                relative_css = theme_css_path.relative_to(theme_path)
+                theme_output_path = self.output_assets_path / relative_css
+                relative_theme_path = theme_output_path.relative_to(
+                    file_using_theme_path.parent,
+                    walk_up=True,
+                )
+            else:
+                relative_theme_path = None
+            
+            # Find all JS files in theme directory
+            js_files = list(theme_path.glob("**/*.js"))
+            for js_file in js_files:
+                relative_js = js_file.relative_to(theme_path)
+                js_output_path = self.output_assets_path / relative_js
+                relative_js_path = js_output_path.relative_to(
+                    file_using_theme_path.parent,
+                    walk_up=True,
+                )
+                theme_js_files.append(str(relative_js_path))
+                logger.debug(f"Found theme JS file: {relative_js_path}")
+            
+            return relative_theme_path, theme_js_files
+        
+        # Handle single CSS file (old behavior)
+        theme_path_resolved = None
         if not theme.endswith(".css"):
             assert default_theme_resource is not None
             with resources.as_file(
                 default_theme_resource.joinpath(theme),
             ) as builtin_theme_path:
-                theme_path = builtin_theme_path.with_suffix(".css").resolve(strict=True)
+                theme_path_resolved = builtin_theme_path.with_suffix(".css").resolve(strict=True)
                 logger.debug(
-                    f"Using built-in theme '{theme}' from '{theme_path.absolute()}'",
+                    f"Using built-in theme '{theme}' from '{theme_path_resolved.absolute()}'",
                 )
         else:
-            theme_path = Path(theme).resolve(strict=True)
-            logger.debug(f"Using theme '{theme_path.absolute()}'")
+            theme_path_resolved = theme_path.resolve(strict=True)
+            logger.debug(f"Using theme '{theme_path_resolved.absolute()}'")
 
-        theme_output_path = self.output_assets_path / theme_path.name
-        self.__copy_to_output(theme_path, theme_output_path)
+        theme_output_path = self.output_assets_path / theme_path_resolved.name
+        self.__copy_to_output(theme_path_resolved, theme_output_path)
 
         relative_theme_path = theme_output_path.relative_to(
             file_using_theme_path.parent,
             walk_up=True,
         )
 
-        return relative_theme_path
+        return relative_theme_path, []
 
     def __copy_favicon(self, file_using_favicon_path: Path, favicon: str) -> Path | str:
         if get_url_type(favicon) == URLType.ABSOLUTE:

@@ -13,8 +13,7 @@ def build(
     input_path: Path,
     output_path: Path,
     strict: bool,
-    assets_dir: Path | None = None,
 ) -> None:
-    markup_generator = MarkupGenerator(config, output_path, strict, assets_dir)
+    markup_generator = MarkupGenerator(config, output_path, strict)
     markup_generator.create_or_clear_output_directory()
     markup_generator.process_markdown(input_path)

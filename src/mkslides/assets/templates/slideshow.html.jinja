@@ -48,6 +48,12 @@
         <script src="{{ revealjs_path }}/plugin/search/search.js"></script>
         <script src="{{ revealjs_path }}/plugin/zoom/zoom.js"></script>
 
+        {% if theme_js_files %}
+            {% for js_file in theme_js_files %}
+                <script src="{{ js_file }}"></script>
+            {% endfor %}
+        {% endif %}
+
         {% if plugins %}
             {% for plugin in plugins %}
                 {% if plugin.extra_javascript %}
